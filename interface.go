@@ -32,3 +32,8 @@ type RealtimeDatabaseListener interface {
 	OnCancel()
 	OnAuthRevoked()
 }
+
+type AuthRefresher interface {
+	AuthRefresh() error
+	Token() TokenInfo
+}
