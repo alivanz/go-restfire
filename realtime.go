@@ -12,17 +12,37 @@ type rtdb_event_data struct {
 	Data *json.RawMessage `json:"data"`
 }
 
-func (x *rtdb) Watch(path string, listener RealtimeDatabaseListener) error {
-	client := &http.Client{}
+func (x *rtdb) watchRequest(path string) (*http.Request, error) {
 	uri := x.url + path + ".json?" + x.authParam()
 	request, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	request.Header.Set("Accept", "text/event-stream")
+	return request, nil
+}
+func (x *rtdb) Watch(path string, listener RealtimeDatabaseListener) error {
+	client := &http.Client{}
+	request, err := x.watchRequest(path)
 	resp, err := client.Do(request)
 	if err != nil {
 		return err
+	}
+	if resp.StatusCode != 401 {
+		// Check if refresher available
+		if x.refresher == nil {
+			return fmt.Errorf("return code %d", resp.StatusCode)
+		}
+		// Refresh auth
+		if err = x.refresher.AuthRefresh(); err != nil {
+			return err
+		}
+		// retry
+		request, err = x.watchRequest(path)
+		resp, err = client.Do(request)
+		if err != nil {
+			return err
+		}
 	}
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("return code %d", resp.StatusCode)
