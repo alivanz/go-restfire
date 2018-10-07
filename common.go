@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 type firebaseAuth struct {
@@ -22,6 +23,7 @@ func requestdata(method string, url string, data interface{}, out interface{}, e
 		body = bytes.NewBuffer(raw)
 	}
 	client := &http.Client{}
+	client.Timeout = 10 * time.Second
 	request, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return err
@@ -31,6 +33,7 @@ func requestdata(method string, url string, data interface{}, out interface{}, e
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	return finalize(resp, out, errframe)
 }
 func finalize(resp *http.Response, out interface{}, errframe error) error {

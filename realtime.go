@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 )
 
 type rtdb_event_data struct {
@@ -23,12 +24,14 @@ func (x *rtdb) watchRequest(path string) (*http.Request, error) {
 }
 func (x *rtdb) Watch(path string, listener RealtimeDatabaseListener) error {
 	client := &http.Client{}
+	client.Timeout = 10 * time.Second
 	request, err := x.watchRequest(path)
 	resp, err := client.Do(request)
 	if err != nil {
 		return err
 	}
 	if resp.StatusCode != 401 {
+		resp.Body.Close()
 		// Check if refresher available
 		if x.refresher == nil {
 			return fmt.Errorf("return code %d", resp.StatusCode)
@@ -44,6 +47,7 @@ func (x *rtdb) Watch(path string, listener RealtimeDatabaseListener) error {
 			return err
 		}
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("return code %d", resp.StatusCode)
 	}
