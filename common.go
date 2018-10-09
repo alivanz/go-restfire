@@ -3,6 +3,7 @@ package restfire
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -23,15 +24,15 @@ func requestdata(method string, url string, data interface{}, out interface{}, e
 		body = bytes.NewBuffer(raw)
 	}
 	client := &http.Client{}
-	client.Timeout = 10 * time.Second
+	client.Timeout = 1 * time.Minute
 	request, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return err
+		return fmt.Errorf("(%s) %v", url, err)
 	}
 	request.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(request)
 	if err != nil {
-		return err
+		return fmt.Errorf("(%s) %v", url, err)
 	}
 	defer resp.Body.Close()
 	return finalize(resp, out, errframe)

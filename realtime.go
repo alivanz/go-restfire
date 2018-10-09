@@ -24,11 +24,11 @@ func (x *rtdb) watchRequest(path string) (*http.Request, error) {
 }
 func (x *rtdb) Watch(path string, listener RealtimeDatabaseListener) error {
 	client := &http.Client{}
-	client.Timeout = 10 * time.Second
+	client.Timeout = 1 * time.Minute
 	request, err := x.watchRequest(path)
 	resp, err := client.Do(request)
 	if err != nil {
-		return err
+		return fmt.Errorf("(watch %s) %v", path, err)
 	}
 	if resp.StatusCode != 401 {
 		resp.Body.Close()
@@ -44,12 +44,12 @@ func (x *rtdb) Watch(path string, listener RealtimeDatabaseListener) error {
 		request, err = x.watchRequest(path)
 		resp, err = client.Do(request)
 		if err != nil {
-			return err
+			return fmt.Errorf("(watch %s) %v", path, err)
 		}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("return code %d", resp.StatusCode)
+		return fmt.Errorf("(watch %s) return code %d", path, resp.StatusCode)
 	}
 	return SSEHandle(resp.Body, func(event string, data json.RawMessage) error {
 		var parsed rtdb_event_data
