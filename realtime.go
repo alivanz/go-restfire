@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 )
 
 type rtdb_event_data struct {
@@ -24,7 +23,7 @@ func (x *rtdb) watchRequest(path string) (*http.Request, error) {
 }
 func (x *rtdb) Watch(path string, listener RealtimeDatabaseListener) error {
 	client := &http.Client{}
-	client.Timeout = 1 * time.Minute
+	// client.Timeout = 1 * time.Minute
 	request, err := x.watchRequest(path)
 	resp, err := client.Do(request)
 	if err != nil {
