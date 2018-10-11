@@ -13,7 +13,12 @@ type rtdb_event_data struct {
 }
 
 func (x *rtdb) watchRequest(path string) (*http.Request, error) {
-	uri := x.url + path + ".json?" + x.authParam()
+	uri := x.url + path + ".json"
+	if x.refresher != nil {
+		if x.refresher.Token() != nil {
+			uri = uri + "?" + x.authParam()
+		}
+	}
 	request, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		return nil, err
@@ -28,23 +33,6 @@ func (x *rtdb) Watch(path string, listener RealtimeDatabaseListener) error {
 	resp, err := client.Do(request)
 	if err != nil {
 		return fmt.Errorf("(watch %s) %v", path, err)
-	}
-	if resp.StatusCode != 401 {
-		resp.Body.Close()
-		// Check if refresher available
-		if x.refresher == nil {
-			return fmt.Errorf("return code %d", resp.StatusCode)
-		}
-		// Refresh auth
-		if err = x.refresher.AuthRefresh(); err != nil {
-			return err
-		}
-		// retry
-		request, err = x.watchRequest(path)
-		resp, err = client.Do(request)
-		if err != nil {
-			return fmt.Errorf("(watch %s) %v", path, err)
-		}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {

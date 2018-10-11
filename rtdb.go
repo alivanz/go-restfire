@@ -22,18 +22,10 @@ func (x *rtdb) authParam() string {
 func (x *rtdb) rtdb_request(method string, url string, data interface{}, out interface{}, errframe error) error {
 	if x.refresher == nil {
 		return requestdata(method, url, data, out, errframe)
-	}
-	for {
-		err := requestdata(method, url+"?"+x.authParam(), data, out, &rtdberr{})
-		if err != nil {
-			if err.Error() != "Auth token is expired" {
-				if err = x.refresher.AuthRefresh(); err != nil {
-					return err
-				}
-			}
-			return err
-		}
-		return nil
+	} else if x.refresher.Token() == nil {
+		return requestdata(method, url, data, out, errframe)
+	} else {
+		return requestdata(method, url+"?"+x.authParam(), data, out, errframe)
 	}
 }
 func (x *rtdb) Get(path string, out interface{}) error {
