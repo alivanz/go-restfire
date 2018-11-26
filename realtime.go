@@ -3,8 +3,12 @@ package restfire
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strings"
+
+	utils "github.com/alivanz/go-utils"
 )
 
 type rtdb_event_data struct {
@@ -67,6 +71,58 @@ func (x *rtdb) Watch(path string, listener RealtimeDatabaseListener) error {
 		}
 		return nil
 	})
+}
+
+type Event struct {
+	Name string
+	Data []byte
+}
+
+func WatchRequest(url string, token TokenInfo) *http.Request {
+	if !strings.HasSuffix(url, ".json") {
+		url = url + ".json"
+	}
+	if token != nil {
+		url = url + "?" + tokenAuth(token)
+	}
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		panic(err)
+	}
+	request.Header.Set("Accept", "text/event-stream")
+	return request
+}
+func tokenAuth(token TokenInfo) string {
+	return "auth=" + token.IDToken()
+}
+
+func WatchAndListen(url string, token TokenInfo) (<-chan utils.SSEEvent, io.Closer, error) {
+	request := WatchRequest(url, token)
+	body, err := utils.HttpDo(
+		&http.Client{},
+		request,
+		utils.MustHTTP200,
+		utils.MustHTTPContentType("text/event-stream"),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	c := make(chan utils.SSEEvent, 8)
+	go ssePump(c, body)
+	return c, body, nil
+}
+
+func ssePump(c chan<- utils.SSEEvent, body io.ReadCloser) {
+	defer close(c)
+	defer body.Close()
+	sse := utils.NewSSE(body)
+	for {
+		event, err := sse.ReadEvent()
+		if err != nil {
+			break
+		}
+		c <- *event
+	}
 }
 
 type SilentRealtimeDatabaseListener struct{}
