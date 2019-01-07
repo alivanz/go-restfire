@@ -2,6 +2,7 @@ package restfire
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -9,6 +10,18 @@ import (
 	"strings"
 
 	utils "github.com/alivanz/go-utils"
+)
+
+const (
+	EventPut       = "put"
+	EventPatch     = "patch"
+	EventKeepAlive = "keep-alive"
+	EventCancel    = "cancel"
+	EventRevoked   = "revoked"
+)
+
+var (
+	DataUntouched = errors.New("data untouched")
 )
 
 type rtdb_event_data struct {
@@ -73,12 +86,10 @@ func (x *rtdb) Watch(path string, listener RealtimeDatabaseListener) error {
 	})
 }
 
-type Event struct {
-	Name string
-	Data []byte
-}
-
 func WatchRequest(url string, token TokenInfo) *http.Request {
+	if !strings.HasPrefix(url, "https://") {
+		url = "https://" + url
+	}
 	if !strings.HasSuffix(url, ".json") {
 		url = url + ".json"
 	}
@@ -123,6 +134,48 @@ func ssePump(c chan<- utils.SSEEvent, body io.ReadCloser) {
 		}
 		c <- *event
 	}
+}
+
+type SSEData struct {
+	Path string          `json:"path"`
+	Data json.RawMessage `json:"data"`
+}
+
+func inList(test string, list []string) bool {
+	for _, elem := range list {
+		if elem == test {
+			return true
+		}
+	}
+	return false
+}
+
+func EventParse(event utils.SSEEvent, v interface{}) (string, error) {
+	var sseData SSEData
+	if inList(event.Event, []string{
+		EventPut,
+		EventPatch,
+	}) {
+		if err := json.Unmarshal(event.Data, &sseData); err != nil {
+			return "", err
+		}
+	}
+	switch event.Event {
+	case EventPut:
+		nulldata := JSONExpand(sseData.Path, []byte("null"))
+		// log.Print(string(nulldata))
+		if err := json.Unmarshal(nulldata, v); err != nil {
+			return "", err
+		}
+		fallthrough
+	case EventPatch:
+		return sseData.Path, json.Unmarshal(JSONExpand(sseData.Path, sseData.Data), v)
+	}
+	return "", DataUntouched
+}
+
+func HasMutualPrefix(a, b string) bool {
+	return strings.HasPrefix(a, b) || strings.HasPrefix(b, a)
 }
 
 type SilentRealtimeDatabaseListener struct{}

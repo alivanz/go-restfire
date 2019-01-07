@@ -14,10 +14,19 @@ func TestRealtime(t *testing.T) {
 		return
 	}
 	go func() {
-		time.Sleep(10 * time.Second)
+		time.Sleep(40 * time.Second)
 		closer.Close()
 	}()
+	var data interface{}
 	for event := range c {
-		log.Print(event)
+		EventParse(event, &data)
+		if err == DataUntouched {
+			log.Print(event)
+			continue
+		} else if err != nil {
+			t.Log(err)
+			t.Fail()
+		}
+		log.Print(data)
 	}
 }
